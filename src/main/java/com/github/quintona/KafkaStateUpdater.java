@@ -27,10 +27,10 @@ public class KafkaStateUpdater extends BaseStateUpdater<KafkaState> {
 			try{
 				if(t.size() > 0) {
 					String topic = (String) t.getStringByField(topicFieldName);
-					String key = (String) t.getStringByField(keyFieldName);
-					String message = t.getStringByField(messageFieldName);
+					byte[] key = (byte[]) t.getValueByField(keyFieldName);
+					byte[] message = (byte[]) t.getValueByField(messageFieldName);
 					
-					state.enqueue(new KeyedMessage<String, String>(topic, key, message));
+					state.enqueue(new KeyedMessage<byte[], byte[]>(topic, key, message));
 				}
 			}catch(Exception e){
 				e.printStackTrace();

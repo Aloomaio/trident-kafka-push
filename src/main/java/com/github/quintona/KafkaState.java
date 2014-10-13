@@ -16,13 +16,13 @@ import backtype.storm.task.IMetricsContext;
 
 public class KafkaState implements State {
 	
-	ConcurrentLinkedQueue<KeyedMessage<String, String>> messages = new ConcurrentLinkedQueue<KeyedMessage<String, String>>();
+	ConcurrentLinkedQueue<KeyedMessage<byte[], byte[]>> messages = new ConcurrentLinkedQueue<KeyedMessage<byte[], byte[]>>();
 
 	public static class Options implements Serializable {
 		
 		private static final long serialVersionUID = 1L;
 		public String zookeeperConnectString = "127.0.0.1:2181";
-		public String serializerClass = "kafka.serializer.StringEncoder";
+		public String serializerClass = "kafka.serializer.DefaultEncoder";
 		public String brokerList = "127.0.0.1:9092";
 		
 		public Options(){}
@@ -56,7 +56,8 @@ public class KafkaState implements State {
 			this.transactional = transactional;
 		}
 
-		@Override
+		@SuppressWarnings("rawtypes")
+        @Override
 		public State makeState(Map conf, IMetricsContext metrics,
 				int partitionIndex, int numPartitions) {
 			return new KafkaState(options, transactional);
@@ -65,18 +66,18 @@ public class KafkaState implements State {
 	}
 	
 	private Options options;
-	Producer<String, String> producer;
+	Producer<byte[], byte[]> producer;
 	private boolean transactional;
 	
 	public KafkaState(Options options, boolean transactional){
 		this.options = options;
 		this.transactional = transactional;
 		Properties props = new Properties();
-		props.put("zk.connect", options.zookeeperConnectString);
-		props.put("serializer.class", options.serializerClass);
-		props.put("metadata.broker.list", options.brokerList);
+		props.put("zk.connect", this.options.zookeeperConnectString);
+		props.put("serializer.class", this.options.serializerClass);
+		props.put("metadata.broker.list", this.options.brokerList);
 		ProducerConfig config = new ProducerConfig(props);
-		producer = new Producer<String, String>(config);
+		producer = new Producer<byte[], byte[]>(config);
 	}
 
 	@Override
@@ -85,25 +86,25 @@ public class KafkaState implements State {
 			throw new RuntimeException("Kafka State is invalid, the previous transaction didn't flush");
 	}
 	
-	public void enqueue(KeyedMessage<String, String> message){
+	public void enqueue(KeyedMessage<byte[], byte[]> message){
 		if(transactional)
 			messages.add(message);
 		else
 			sendMessage(message);
 	}
 	
-	private void sendMessage(KeyedMessage<String, String> message){
+	private void sendMessage(KeyedMessage<byte[], byte[]> message){
 		producer.send(message);
 	}
 	
-	private void sendBatch(List<KeyedMessage<String, String>> messages){
+	private void sendBatch(List<KeyedMessage<byte[], byte[]>> messages){
 		producer.send(messages);
 	}
 
 	@Override
 	public void commit(Long txid) {
-		KeyedMessage<String, String> message = messages.poll();
-		List<KeyedMessage<String, String>> toSend = new ArrayList<KeyedMessage<String,String>>();
+		KeyedMessage<byte[], byte[]> message = messages.poll();
+		List<KeyedMessage<byte[], byte[]>> toSend = new ArrayList<KeyedMessage<byte[], byte[]>>();
 		while(message != null){
 			toSend.add(message);
 			message = messages.poll();
